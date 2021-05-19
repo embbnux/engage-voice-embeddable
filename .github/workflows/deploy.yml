@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - master
+      - chore/ci
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
