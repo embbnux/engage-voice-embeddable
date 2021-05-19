@@ -88,11 +88,14 @@ function compile({ brandName = 'rc', buildPath }) {
     authConfig,
   });
   return new Promise((resolve, reject) => {
-    webpack(config, (err) => {
+    webpack(config, (err, stats) => {
       if (err) {
         console.log(err);
         reject(err);
         return;
+      }
+      if (stats.hasErrors()) {
+        return reject(new Error(stats.compilation.errors.join('\n')))
       }
       resolve();
     });
