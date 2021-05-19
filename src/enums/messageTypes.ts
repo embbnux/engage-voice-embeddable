@@ -1,13 +1,13 @@
-import { createEnum } from 'ringcentral-integration/lib/Enum';
+import { ObjectMap } from '@ringcentral-integration/core/lib/ObjectMap';
 
-export default createEnum([
+export default ObjectMap.prefixKeys([
   'init',
   'register',
   'clickToDial',
   'popUpWindow',
   'searchAndScreenPop',
   'matchContacts',
-  'matchActivities',
+  'matchCallLogs',
   'logCall',
   'syncClosed',
   'syncMinimized',
@@ -18,4 +18,6 @@ export default createEnum([
   'pushLocale',
   'setEnvironment',
   'newCall',
+  'ringCall',
+  'loginPopup',
 ], 'rc-ev');

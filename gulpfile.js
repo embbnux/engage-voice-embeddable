@@ -11,8 +11,8 @@ import getWebpackConfig from './src/lib/getWebpackConfig';
 require('dotenv').config();
 
 const rcSDKConfig = {
-  appKey: process.env.RINGCENTRAL_CLIENT_ID,
-  appSecret: process.env.RINGCENTRAL_CLIENT_SECRET,
+  clientId: process.env.RINGCENTRAL_CLIENT_ID,
+  clientSecret: process.env.RINGCENTRAL_CLIENT_SECRET,
   server: process.env.RINGCENTRAL_SERVER,
 };
 
@@ -25,7 +25,6 @@ const evAgentConfig = {
 
 const authConfig = {
   redirectUri: process.env.AUTH_REDIRECT_URI,
-  proxyUri: process.env.AUTH_PROXY_URI,
 };
 
 const localeSettings = {

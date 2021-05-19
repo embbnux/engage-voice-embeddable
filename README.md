@@ -1,8 +1,10 @@
-# Engage Voice Embeddable
+# Engage Voice Embeddable (Beta)
+
+[![Build Status](https://github.com/ringcentral/engage-voice-embeddable/workflows/Deploy/badge.svg?branch=master)](https://github.com/ringcentral/engage-voice-embeddable/actions)
 
 ## Introduction
 
-This is an out-of-the-box embeddable web application that help developers to integrate RingCentral Engage Voice services to their web applications with few code.
+This is an out-of-the-box embeddable web application that help developers to integrate [RingCentral Engage Voice](https://www.ringcentral.com/engage/engage-voice.html) services to their web applications with few code.
 
 ## Visit Online
 
@@ -23,72 +25,15 @@ Visit [website](https://ringcentral.github.io/engage-voice-embeddable/) in GitHu
 </script>
 ```
 
-## API
+## Documents
 
-### Create a new Call
-
-```js
-RCAdapter.clickToDial(phoneNumber)
-```
-
-### Register a logger and contact matcher service
-
-```js
-var registered = false;
-window.addEventListener('message', function(event) {
-  var message = event.data;
-  if (!registered && message && message.type === 'rc-ev-init') {
-    registered = true;
-    RCAdapter.registerService({
-      name: 'TestService',
-      callLoggerEnabled: true,
-      contactMatcherEnabled: true,
-    });
-    RCAdapter.transport.addListeners({
-      push: function (data) { // listen push event from rc widget
-        // new call event
-        if (data.type === 'rc-ev-newCall') {
-          console.log('new call:', data.call);
-        }
-      },
-      request: function (req) { // listen request event from rc widget
-        var payload = req.payload;
-        // handle log request
-        if (payload.requestType === 'rc-ev-logCall') {
-          console.log('logCall:', payload.data);
-          RCAdapter.transport.response({
-            requestId: req.requestId,
-            result: 'ok',
-          });
-          return;
-        }
-        // handle match contacts request
-        if (payload.requestType === 'rc-ev-matchContacts') {
-          var queries = payload.data;
-          console.log('matchContacts:', queries);
-          var contactMapping = {};
-          queries.forEach(function (query) {
-            contactMapping[query.phoneNumber] = [{
-              id: query.phoneNumber,
-              type: 'TestService',
-              name: 'Test User ' + query.phoneNumber,
-              phoneNumbers: [{
-                phoneNumber: query.phoneNumber,
-                phoneType: 'direct',
-              }]
-            }]; // Array
-          });
-          RCAdapter.transport.response({
-            requestId: req.requestId,
-            result: contactMapping,
-          });
-          return;
-        }
-      }
-    });
-  }
-});
-```
+* [Get Started](docs/get-started.md)
+* [Customize Client ID and environment](docs/customize-client-id.md)
+* [Customize Redirect Uri](docs/customize-redirect-uri.md)
+* [Customize Authorization](docs/customize-authorization.md)
+* [API](docs/api.md)
+* [Message Transport](docs/message-transport.md)
+* [Call Events](docs/call-events.md)
 
 ## Awesome Embeddable projects
 
@@ -115,14 +60,11 @@ Create `.env` file in project root path:
 
 ```
 RINGCENTRAL_CLIENT_ID=your_ringcentral_app_client_id
-RINGCENTRAL_CLIENT_SECRET=your_ringcentral_app_client_secret
 RINGCENTRAL_SERVER=https://platform.ringcentral.com
-
-AUTH_REDIRECT_URI=http://localhost:8080/redirect.html
-AUTH_PROXY_URI=http://localhost:8080/proxy.html
 
 ENGAGE_VOICE_AUTH_SERVER=https://engage.ringcentral.com
 ```
+**Notice**: Now the Engage Voice service only is supported on production environment. Please make sure your key is graduated into RingCentral production environment.
 
 ### Start development server
 
@@ -136,3 +78,18 @@ $ yarn start # start a webpack dev server
 ```
 
 Open site: 'http://localhost:8080/' on browser
+
+### Deploy on production
+
+If you create pull request to this repository and get merged, CI will deploy it to this repository's github page automatically. But for something that customized, you can deploy it to your own web space, such as your github page.
+
+1. Update `.env` file in production environment
+2. Run command to compile code and build release
+
+```
+$ yarn build --hosting-url your_host_url
+```
+
+Please replace `your_host_uri` with your own web host address, such as `https://ringcentral.github.io/engage-voice-embeddable`.
+
+3. Upload all files in `build/rc` folder to your web space. And visit it in browser.

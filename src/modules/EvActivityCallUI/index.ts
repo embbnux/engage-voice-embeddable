@@ -1,5 +1,6 @@
 import { Module } from 'ringcentral-integration/lib/di';
-import { createSelector } from '@ringcentral-integration/core';
+import { computed } from '@ringcentral-integration/core';
+import { format } from '@ringcentral-integration/phone-number';
 
 import {
   EvCurrentLog,
@@ -7,39 +8,15 @@ import {
 } from '@ringcentral-integration/engage-voice-widgets/interfaces/EvActivityCallUI.interface';
 import i18n from '@ringcentral-integration/engage-voice-widgets/modules/EvActivityCallUI/i18n';
 import { EvActivityCallUI as BaseActivityCallUI } from '@ringcentral-integration/engage-voice-widgets/modules/EvActivityCallUI';
-import { EvCall } from '@ringcentral-integration/engage-voice-widgets/interfaces/EvData.interface';
-import { logTypes } from '@ringcentral-integration/engage-voice-widgets/enums/logTypes';
-
-import { formatCallFromEVCall } from '../../lib/formatCallFromEVCall';
+import { logTypes, tabManagerEvents } from '@ringcentral-integration/engage-voice-widgets/enums';
 
 import { getCallInfos } from './utils/getCallInfos';
-import { DepsModules, State } from './interface';
+import { Deps } from './interface';
 
 @Module({
-  deps: ['ThirdPartyService', 'Storage', 'ContactMatcher', 'AppConfig'],
+  deps: ['Storage', 'ThirdPartyService', 'ContactMatcher', 'AppConfig'],
 })
-class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
-  constructor({
-    thirdPartyService,
-    enableCache = true,
-    storage,
-    contactMatcher,
-    appConfig,
-    ...options
-  }) {
-    super({
-      modules: {
-        thirdPartyService,
-        storage,
-        contactMatcher,
-        appConfig,
-      },
-      enableCache,
-      storageKey: 'EvActivityCallUI',
-      ...options,
-    } as any);
-  }
-
+class EvActivityCallUI extends BaseActivityCallUI<Deps> {
   getCustomLogFields({ required, validated }) {
     const notes = {
       label: 'Notes',
@@ -57,9 +34,9 @@ class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
         }
       },
     };
-    const dispositionPickList = this.getDispositionPickList();
+    const dispositionPickList = this.dispositionPickList;
     if (dispositionPickList.length === 0) {
-      if (!this._modules.appConfig.hideCallNote) {
+      if (!this._deps.appConfig.hideCallNote) {
         return [notes];
       }
       return [];
@@ -69,12 +46,16 @@ class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
       sort: 5,
       type: 'picklist',
       value: 'dispositionId',
+      placeholder: i18n.getString(
+        'pleaseSelect',
+        this._deps.locale.currentLocale,
+      ),
       required: true,
       picklistOptions: dispositionPickList,
       defaultValue: 'None',
       error: !validated.dispositionId,
       helperText: !validated.dispositionId
-        ? i18n.getString('dispositionError', this._modules.locale.currentLocale)
+        ? i18n.getString('dispositionError', this._deps.locale.currentLocale)
         : undefined,
       onChange: (value: string) => {
         const currentDisposition = dispositionPickList.find(
@@ -95,78 +76,96 @@ class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
         });
       },
     };
-    if (this._modules.appConfig.hideCallNote) {
+    if (this._deps.appConfig.hideCallNote) {
       return [disposition];
     }
     return [notes, disposition];
   }
 
-  getActivityCallLog = createSelector(
-    () => this.callId,
-    () => this.currentEvCall,
-    () => this._modules.evCallDisposition.callsMapping[this.callId],
-    () => this.validated,
-    () => this.required,
-    () => this._modules.contactMatcher.dataMapping,
-    (
-      callId,
-      currentCall,
-      callDisposition,
-      validated,
-      required,
-      contactMapping: any,
-    ): EvCurrentLog => {
-      if (!currentCall) {
-        return undefined;
-      }
-      const { dispositionId, notes } = callDisposition || {};
-      return {
-        currentEvRawCall: currentCall,
-        // the call which maps for rc component
-        call: formatCallFromEVCall(currentCall, contactMapping),
-        currentSessionId: callId,
-        // TODO: this will be remove when api can using.
-        currentLogCall: {
-          isFailed: false,
-          isAutoSave: false,
-          isCreated: false,
+  @computed((that: EvActivityCallUI) => [
+    that.callId,
+    that.currentEvCall,
+    that._deps.evCallDisposition.callsMapping[that.callId],
+    that.validated,
+    that.required,
+    that._deps.locale.currentLocale,
+    that.dispositionPickList,
+  ])
+  get myActivityCallLog() : EvCurrentLog {
+    const currentCall = this.currentEvCall;
+    if (!currentCall) {
+      return null;
+    }
+    const { contactMatches = [], callType } = this.currentEvCall;
+    const callId = this.callId;
+    const callDisposition = this._deps.evCallDisposition.callsMapping[callId];
+    const { dispositionId, notes } = callDisposition || {};
+    const name = contactMatches[0] && contactMatches[0].name;
+    return {
+      ...this.activityCallLog,
+      call: {
+        ...this.activityCallLog.call,
+        to: {
+          ...this.activityCallLog.call.to,
+          name:
+            callType === 'OUTBOUND'
+              ? name
+              : this.activityCallLog.call.to.name,
         },
-        customLogFields: this.getCustomLogFields({ required, validated }),
-        task: {
-          // TODO fix Task interface with generic type
-          // @ts-ignore
-          dispositionId,
-          notes,
+        from: {
+          ...this.activityCallLog.call.from,
+          name:
+            callType !== 'OUTBOUND'
+              ? name
+              : this.activityCallLog.call.from.name,
         },
-      };
-    },
-  )
+        recordingUrl: this.activityCallLog.currentEvRawCall?.session?.recordingUrl,
+      },
+      showInfoMeta: {
+        title: '',
+        entity: null,
+      },
+      customLogFields: this.getCustomLogFields({ required: this.required, validated: this.validated }),
+      task: {
+        // TODO fix Task interface with generic type
+        // @ts-ignore
+        dispositionId,
+        notes,
+      },
+    };
+  }
 
-  getBasicInfo = createSelector(
-    () => this.currentEvCall,
-    () => this.getActivityCallLog(),
-    (
-      currentEvCall: EvCall,
-      { call }: EvCurrentLog,
-    ) => {
-      const isInbound = call.direction === 'INBOUND';
-      const fromMatchName = call.from.name || call.from.phoneNumber;
-      const toMatchName = call.to.name || call.to.phoneNumber;
+  @computed((that: EvActivityCallUI) => [
+    that.currentEvCall,
+    that.myActivityCallLog,
+    that._deps.locale.currentLocale,
+  ])
+  get basicInfo() {
+    if (!this.currentEvCall) return null;
+    const currentEvCall = this.currentEvCall;
+    const { call } = this.myActivityCallLog;
+    const isInbound = call.direction === 'INBOUND';
+    const fromMatchName = call.from.name || call.from.phoneNumber;
+    const toMatchName = call.to.name || call.to.phoneNumber;
+    const phoneNumber = isInbound ? call.from.phoneNumber : call.to.phoneNumber;
+    const formattedNumber = format({
+      phoneNumber,
+      countryCode: 'US',
+    });
 
-      return {
-        subject: isInbound ? fromMatchName : toMatchName,
-        callInfos: getCallInfos(currentEvCall),
-        followInfos: [
-          isInbound ? call.from.phoneNumber : call.to.phoneNumber,
-          ...(currentEvCall ? [currentEvCall.queue.name] : []),
-        ],
-      };
-    },
-  );
+    return {
+      subject: isInbound ? fromMatchName : toMatchName,
+      callInfos: getCallInfos(currentEvCall, this._deps.locale.currentLocale),
+      followInfos: [
+        formattedNumber,
+        ...(currentEvCall ? [currentEvCall.queue.name] : []),
+      ],
+    };
+  }
 
   private async _submitData(id: string) {
     try {
-      const saveFields = this._modules.evCallDisposition.callsMapping[id];
+      const saveFields = this._deps.evCallDisposition.callsMapping[id];
       if (saveFields) {
         this.changeFormStatus({
           validated: {
@@ -181,17 +180,10 @@ class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
       }
       this.changeSavingStatus('saving');
       await this.disposeCall(id);
-      this.changeSavingStatus('saved');
-      if (!this.tabManagerEnabled) {
-        this._modules.alert.success({
-          message: logTypes.CALL_DISPOSITION_SUCCESS,
-        });
-        // delay for animation with loading ui.
-        setTimeout(() => this.goDialer(), 1000);
-      }
-      this._modules.evWorkingState.setIsPendingDisposition(false);
-    } catch (error) {
-      this._modules.alert.danger({
+      this._sendTabManager(tabManagerEvents.CALL_DISPOSITION_SUCCESS);
+      this._dispositionSuccess();
+    } catch (e) {
+      this._deps.alert.danger({
         message: logTypes.CALL_DISPOSITION_FAILURE,
         ttl: 0,
       });
@@ -208,41 +200,45 @@ class EvActivityCallUI extends BaseActivityCallUI<DepsModules, State> {
 
   async disposeCall() {
     try {
-      const callLog = this.getActivityCallLog()
-      await this._modules.thirdPartyService.logCall({
+      const callLog = this.myActivityCallLog;
+      await this._deps.thirdPartyService.logCall({
         call: callLog.call,
         task: callLog.task,
+        sessionId: callLog.currentSessionId,
       });
     } catch (e) {
       console.error(e);
     }
-    await this._modules.evCallDisposition.disposeCall(this.callId);
-  }
-
-  async disposeCurrentCall() {
-    await this.disposeCall();
+    await super.disposeCall();
   }
 
   get showSubmitStep() {
-    if (!this._modules.appConfig.hideCallNote) {
+    if (!this._deps.appConfig.hideCallNote) {
       return true;
     }
-    const dispositionPickList = this.getDispositionPickList();
+    const dispositionPickList = this.dispositionPickList;
     if (dispositionPickList.length === 0) {
       return false;
     }
-    const activityCallLog = this.getActivityCallLog();
+    const activityCallLog = this.myActivityCallLog;
     if (activityCallLog.call.direction === 'INBOUND') {
       return true;
     }
     return false;
   }
 
+  async gotoDialWithoutSubmit() {
+    await this.disposeCall();
+    this._deps.evWorkingState.setIsPendingDisposition(false);
+    this.goDialer();
+  }
+
   getUIProps({ id }): EvActivityCallUIProps {
+    const originalProps = super.getUIProps({ id });
     return {
-      ...super.getUIProps({ id }),
-      currentLog: this.getActivityCallLog(),
-      basicInfo: this.getBasicInfo(),
+      ...originalProps,
+      currentLog: this.myActivityCallLog,
+      basicInfo: this.basicInfo,
     };
   }
 }

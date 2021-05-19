@@ -7,16 +7,17 @@ import {
   action,
 } from '@ringcentral-integration/core/lib/RcModule';
 import messageTypes from '../../enums/messageTypes';
-import { Interface, DepsModules, State } from './interface';
+import { Interface, Deps } from './interface';
 
 @Module({
   deps: [
     'EvDialerUI',
-    { dep: 'GlobalStorage', optional: true },
-    { dep: 'AdapterOptions', optional: true, spread: true },
+    'EvCall',
+    'GlobalStorage',
+    { dep: 'AdapterOptions', optional: true },
   ],
 })
-class Adapter extends RcModuleV2<DepsModules, State> implements Interface {
+class Adapter extends RcModuleV2<Deps> implements Interface {
   public messageTypes: typeof messageTypes;
   public transport: MessageTransport;
 
@@ -24,23 +25,15 @@ class Adapter extends RcModuleV2<DepsModules, State> implements Interface {
   private _lastPosition: any;
   private _lastMinimized: any;
 
-  constructor({
-    globalStorage,
-    evDialerUI,
-    enableGlobalCache = true,
-    targetWindow = window.parent,
-  }) {
+  constructor(deps: Deps) {
     super({
-      modules: {
-        globalStorage,
-        evDialerUI,
-      },
-      enableGlobalCache,
+      deps,
+      enableGlobalCache: true,
       storageKey: 'Adapter',
     });
     this.messageTypes = messageTypes;
     this.transport = new MessageTransport({
-      targetWindow,
+      targetWindow: this._deps.adapterOptions?.targetWindow ?? window.parent,
     } as any);
     this.addListeners();
     this._lastPosition = {};
@@ -70,22 +63,22 @@ class Adapter extends RcModuleV2<DepsModules, State> implements Interface {
 
   @action
   setClosed(closed) {
-    this.state.closed = closed;
+    this.closed = closed;
   }
 
   @action
   setMinimized(minimized) {
-    this.state.minimized = minimized;
+    this.minimized = minimized;
   }
 
   @action
   setSize(size) {
-    this.state.size = size;
+    this.size = size;
   }
 
   @action
   setPosition(position) {
-    this.state.position = position;
+    this.position = position;
   }
 
   addListeners() {
@@ -124,7 +117,9 @@ class Adapter extends RcModuleV2<DepsModules, State> implements Interface {
   }
 
   async clickToDial(phoneNumber) {
-    await this._modules.evDialerUI.clickToDial(phoneNumber);
+    this._deps.evDialerUI.setToNumber(phoneNumber);
+    this._deps.evDialerUI.setLatestDialoutNumber();
+    await this._deps.evCall.dialout(this._deps.evDialerUI.toNumber);
   }
 
   onAppStart() {
@@ -136,6 +131,13 @@ class Adapter extends RcModuleV2<DepsModules, State> implements Interface {
   onNewCall(call) {
     this._postMessage({
       type: this.messageTypes.newCall,
+      call,
+    });
+  }
+
+  onRingCall(call) {
+    this._postMessage({
+      type: this.messageTypes.ringCall,
       call,
     });
   }

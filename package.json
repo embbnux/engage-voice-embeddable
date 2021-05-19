@@ -1,6 +1,6 @@
 {
   "name": "engage-voice-embeddable",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "RingCentral Engage Voice Embeddable widget",
   "browserslist": "> 0.25%, ie > 10",
   "scripts": {
@@ -40,11 +40,14 @@
     "yargs": "^14.0.0"
   },
   "dependencies": {
-    "@ringcentral-integration/core": "^0.11.1",
-    "@ringcentral-integration/i18n": "^2.0.0",
-    "@ringcentral-integration/phone-number": "^1.0.2",
-    "@ringcentral-integration/rcui": "^0.1.0",
-    "@ringcentral-integration/engage-voice-widgets": "^0.0.1",
+    "@ringcentral/sdk": "^4.4.1",
+    "@ringcentral/juno": "^1.4.1",
+    "@ringcentral/subscriptions": "^4.4.1",
+    "@ringcentral-integration/core": "^0.12.6",
+    "@ringcentral-integration/i18n": "^2.0.1",
+    "@ringcentral-integration/phone-number": "^1.0.7",
+    "@ringcentral-integration/engage-voice-widgets": "^0.12.6",
+    "@rc-ex/core": "^0.4.2",
     "classnames": "^2.2.5",
     "dotenv": "^6.2.0",
     "format-message": "^5.1.2",
@@ -52,16 +55,17 @@
     "moment-timezone": "^0.5.27",
     "normalize-css": "^2.3.1",
     "prop-types": "^15.7.2",
+    "ramda": "^0.26.1",
     "qs": "^6.8.0",
-    "react": "^16.11.0",
-    "react-dom": "^16.11.0",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
     "react-redux": "^5.1.1",
     "react-router": "^3.2.0",
     "react-router-redux": "^4.0.7",
     "redux": "^4.0.4",
-    "ringcentral": "^3.2.1",
     "ringcentral-client": "^1.0.0-beta.2",
-    "ringcentral-integration": "^0.11.1",
-    "ringcentral-widgets": "^0.11.1"
+    "ringcentral-integration": "^0.12.6",
+    "ringcentral-widgets": "^0.12.6",
+    "styled-components": "^5.2.0"
   }
 }

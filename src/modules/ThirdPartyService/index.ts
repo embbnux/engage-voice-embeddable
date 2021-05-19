@@ -8,32 +8,30 @@ import {
   action,
 } from '@ringcentral-integration/core/lib/RcModule';
 
-import { Interface, DepsModules, State } from './interface';
+import { Interface, Deps } from './interface';
 
 import messageTypes from '../../enums/messageTypes';
 
 @Module({
   deps: [
     'ContactMatcher',
-    { dep: 'ThirdPartyServiceOptions', optional: true, spread: true },
+    'ActivityMatcher',
+    { dep: 'ThirdPartyServiceOptions', optional: true },
   ],
 })
-class ThirdPartyService extends RcModuleV2<DepsModules, State>
+class ThirdPartyService extends RcModuleV2<Deps>
   implements Interface {
   public transport: MessageTransport;
   public messageTypes: typeof messageTypes;
 
-  constructor({ targetWindow = window.parent, contactMatcher, ...options }) {
+  constructor(deps: Deps) {
     super({
-      modules: {
-        contactMatcher,
-      },
-      ...options,
+      deps,
     });
 
     this.messageTypes = messageTypes;
     this.transport = new MessageTransport({
-      targetWindow,
+      targetWindow: this._deps.thirdPartyServiceOptions?.targetWindow ?? window.parent,
     } as any);
     this.addListeners();
   }
@@ -43,14 +41,16 @@ class ThirdPartyService extends RcModuleV2<DepsModules, State>
     name: '',
     callLoggerEnabled: false,
     contactMatcherEnabled: false,
+    callLogMatcherEnabled: false,
   };
 
   @action
   setService(service) {
-    this.state.service = {
+    this.service = {
       name: service.name,
       callLoggerEnabled: service.callLoggerEnabled,
       contactMatcherEnabled: service.contactMatcherEnabled,
+      callLogMatcherEnabled: service.callLogMatcherEnabled,
     };
   }
 
@@ -75,16 +75,20 @@ class ThirdPartyService extends RcModuleV2<DepsModules, State>
       this.setService(data.service);
       if (data.service.contactMatcherEnabled) {
         this.registerContactMatch();
-        this._modules.contactMatcher.triggerMatch();
+        this._deps.contactMatcher.triggerMatch();
+      }
+      if (data.service.callLogMatcherEnabled) {
+        this.registerActivityMatch();
+        this._deps.activityMatcher.triggerMatch();
       }
     }
   }
 
   registerContactMatch() {
-    if (this._modules.contactMatcher._searchProviders.has(this.service.name)) {
+    if (this._deps.contactMatcher._searchProviders.has(this.service.name)) {
       return;
     }
-    this._modules.contactMatcher.addSearchProvider({
+    this._deps.contactMatcher.addSearchProvider({
       name: this.service.name,
       searchFn: async ({ queries }) => {
         const result = await this.matchContacts(queries);
@@ -112,12 +116,55 @@ class ThirdPartyService extends RcModuleV2<DepsModules, State>
       if (!data || Object.keys(data).length === 0) {
         return result;
       }
-      decodedQueries.forEach((query) => {
-        const phoneNumber = query.phoneNumber;
+      queries.forEach((query) => {
+        const decodedQuery = contactMatchIdentifyDecode(query);
+        const phoneNumber = decodedQuery.phoneNumber;
         if (data[phoneNumber] && Array.isArray(data[phoneNumber])) {
-          result[phoneNumber] = data[phoneNumber];
+          result[query] = data[phoneNumber];
         } else {
-          result[phoneNumber] = [];
+          result[query] = [];
+        }
+      });
+      return result;
+    } catch (e) {
+      console.error(e);
+      return {};
+    }
+  }
+
+  registerActivityMatch() {
+    if (this._deps.activityMatcher._searchProviders.has(this.service.name))
+      return;
+    this._deps.activityMatcher.addSearchProvider({
+      name: this.service.name,
+      searchFn: async ({ queries }: any) => {
+        const result = await this.matchActivities(queries);
+        return result;
+      },
+      readyCheckFn: () => true,
+    });
+  }
+
+  async matchActivities(queries: any[]) {
+    try {
+      const result = {};
+      if (!this.service.callLogMatcherEnabled) {
+        return result;
+      }
+      const data = await this.transport.request({
+        payload: {
+          requestType: this.messageTypes.matchCallLogs,
+          data: queries,
+        },
+      });
+      if (!data || Object.keys(data).length === 0) {
+        return result;
+      }
+      queries.forEach((query) => {
+        if (data[query] && Array.isArray(data[query])) {
+          result[query] = data[query];
+        } else {
+          result[query] = [];
         }
       });
       return result;
@@ -137,6 +184,12 @@ class ThirdPartyService extends RcModuleV2<DepsModules, State>
         data,
       },
     });
+    if (this.service.callLogMatcherEnabled) {
+      this._deps.activityMatcher.match({
+        queries: [data.sessionId],
+        ignoreCache: true
+      });
+    }
   }
 }
 

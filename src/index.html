@@ -75,11 +75,15 @@
           name: 'TestService',
           callLoggerEnabled: true,
           contactMatcherEnabled: true,
+          callLogMatcherEnabled: true,
         });
         RCAdapter.transport.addListeners({
           push: function (data) {
             if (data.type === 'rc-ev-newCall') {
               console.log('new call:', data.call);
+            }
+            if (data.type === 'rc-ev-ringCall') {
+              console.log('ringing call:', data.call);
             }
           },
           request: function (req) {
@@ -102,6 +106,21 @@
               RCAdapter.transport.response({
                 requestId: req.requestId,
                 result: contactMapping,
+              });
+              return;
+            }
+            if (payload.requestType === 'rc-ev-matchCallLogs') {
+              var queries = payload.data;
+              console.log('matchCallLogs:', queries);
+              var callLogMapping = {};
+              if (queries.length === 1) {
+                callLogMapping[queries[0]] = [{
+                  id: queries[0],
+                }];
+              }
+              RCAdapter.transport.response({
+                requestId: req.requestId,
+                result: callLogMapping,
               });
               return;
             }

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { createStore } from 'redux';
 
-import { theme } from '@ringcentral-integration/engage-voice-widgets/theme';
+import './lib/BroadcastChannel.polyfill';
 
 import { createPhone } from './modules/Phone';
 import prefix from './prefix';
@@ -18,18 +18,41 @@ const authConfig = process.env.AUTH_CONFIG;
 
 const currentUri = window.location.href;
 const pathParams = parseUri(currentUri);
-const { hideCallNote } = pathParams;
+const {
+  hideCallNote,
+  clientId,
+  clientSecret,
+  redirectUri,
+  rcServer,
+  evServer,
+  disableLoginPopup,
+} = pathParams;
+
+if (clientId) {
+  sdkConfig.clientId = clientId;
+  if (clientSecret) {
+    sdkConfig.clientSecret = clientSecret;
+  }
+}
+if (rcServer) {
+  sdkConfig.server = rcServer;
+}
+if (evServer) {
+  evSdkConfig.authHost = evServer;
+}
 // @ts-ignore
 const phone = createPhone({
   sdkConfig,
   brandConfig,
   evSdkConfig,
+  redirectUri,
   authConfig,
   prefix,
   version,
   buildHash,
   hideCallNote: !!hideCallNote,
   runTimeEnvironment: process.env.NODE_ENV,
+  disableLoginPopup: !!disableLoginPopup,
 });
 
 const store = createStore(phone.reducer);
@@ -39,6 +62,6 @@ phone.setStore(store);
 window.phone = phone;
 
 ReactDOM.render(
-  <App phone={phone} theme={theme} />,
+  <App phone={phone} />,
   document.querySelector('div#viewport'),
 );
