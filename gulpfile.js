@@ -90,6 +90,7 @@ function compile({ brandName = 'rc', buildPath }) {
   return new Promise((resolve, reject) => {
     webpack(config, (err) => {
       if (err) {
+        console.log(err);
         reject(err);
         return;
       }
