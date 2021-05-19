@@ -26,7 +26,7 @@ jobs:
           RINGCENTRAL_CLIENT_ID: ${{ secrets.RINGCENTRAL_CLIENT_ID }}
           RINGCENTRAL_SERVER: ${{ secrets.RINGCENTRAL_SERVER }}
           ENGAGE_VOICE_AUTH_SERVER: ${{ secrets.ENGAGE_VOICE_AUTH_SERVER }}
-      - run: ls ./
+      - run: ls ./build
       - name: Github Pages
         uses: JamesIves/github-pages-deploy-action@3.7.1
         with:
